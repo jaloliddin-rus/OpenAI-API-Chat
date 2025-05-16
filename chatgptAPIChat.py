@@ -231,46 +231,13 @@ def check_stored_api_key():
 # Main title
 st.title("🤖 ChatGPT API Chat Interface")
 
-# Check for stored API key on first load or if user selected to use stored key
+# Check for stored API key on first load
 if not st.session_state.api_key_valid:
     # Use a simpler approach with query parameters
     query_params = st.query_params
     
-    # Check if user is trying to use stored key
-    if st.session_state.get('use_stored_key', False):
-        # Show a component that will get the stored key and redirect
-        retrieve_key_html = """
-        <script>
-        function retrieveAndValidateKey() {
-            const storedKey = localStorage.getItem('chatgpt_api_key');
-            if (storedKey && storedKey !== '') {
-                try {
-                    const decodedKey = atob(storedKey);
-                    if (decodedKey && decodedKey.startsWith('sk-')) {
-                        // Redirect with the key in URL
-                        const url = new URL(window.location);
-                        url.searchParams.set('stored_key', decodedKey);
-                        window.location.href = url.toString();
-                    } else {
-                        alert('Invalid stored API key format');
-                    }
-                } catch (error) {
-                    alert('Error retrieving stored key: ' + error.message);
-                }
-            } else {
-                alert('No stored API key found');
-            }
-        }
-        // Execute immediately
-        retrieveAndValidateKey();
-        </script>
-        <div>Retrieving stored API key...</div>
-        """
-        components.html(retrieve_key_html, height=50)
-        st.session_state.use_stored_key = False  # Reset flag
-    
     # Check if we have a stored key in query params (for internal use)
-    elif "stored_key" in query_params and query_params["stored_key"] and not st.session_state.api_key_valid:
+    if "stored_key" in query_params and query_params["stored_key"] and not st.session_state.api_key_valid:
         stored_key = query_params["stored_key"]
         with st.spinner("Validating stored API key..."):
             is_valid, result = validate_api_key(stored_key)
@@ -362,9 +329,41 @@ if not st.session_state.api_key_valid:
         
         # Alternative: Use stored key button
         if st.button("🔑 Use Stored API Key", help="Click this if you've checked and found a stored key", key="use_stored_key_btn"):
-            st.info("Attempting to use stored API key...")
-            st.session_state.use_stored_key = True
-            st.rerun()
+            # Create a placeholder for feedback
+            feedback_placeholder = st.empty()
+            
+            with feedback_placeholder:
+                st.info("🔍 Retrieving stored API key...")
+            
+            # Use JavaScript to get the stored key and redirect
+            use_key_html = """
+            <script>
+            function useStoredApiKey() {
+                const storedKey = localStorage.getItem('chatgpt_api_key');
+                if (storedKey && storedKey !== '') {
+                    try {
+                        const decodedKey = atob(storedKey);
+                        if (decodedKey && decodedKey.startsWith('sk-')) {
+                            // Redirect with the key in URL
+                            const url = new URL(window.location);
+                            url.searchParams.set('stored_key', decodedKey);
+                            window.location.href = url.toString();
+                        } else {
+                            alert('Invalid stored API key format');
+                        }
+                    } catch (error) {
+                        alert('Error retrieving stored key: ' + error.message);
+                    }
+                } else {
+                    alert('No stored API key found. Please check that you have one saved first.');
+                }
+            }
+            
+            // Execute the function immediately
+            useStoredApiKey();
+            </script>
+            """
+            components.html(use_key_html, height=0)
         
         # Check if stored key was submitted
         if st.query_params.get("stored_key"):
