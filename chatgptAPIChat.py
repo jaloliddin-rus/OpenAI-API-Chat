@@ -1,7 +1,3 @@
-# Author: Jaloliddin Rustamov
-# Date: 17th May 2025
-# Description: A Streamlit application that provides a chat interface for OpenAI's GPT models via API.
-
 import streamlit as st
 from io import BytesIO
 from pathlib import Path
@@ -10,6 +6,8 @@ from PyPDF2 import PdfReader
 from PIL import Image
 from openai import OpenAI, OpenAIError
 import time
+import base64
+import json
 
 # Configure page layout
 st.set_page_config(page_title="ChatGPT API Interface", layout="wide")
@@ -27,59 +25,111 @@ if "api_key_valid" not in st.session_state:
     st.session_state.api_key_valid = False
 if "client" not in st.session_state:
     st.session_state.client = None
-if "stored_api_key" not in st.session_state:
-    st.session_state.stored_api_key = None
-if "check_local_storage" not in st.session_state:
-    st.session_state.check_local_storage = True
 
 # Model configurations with their specific parameters
 MODELS_CONFIG = {
-    # Standard GPT models
+    # Newest GPT-4.1 series models (April 2025)
+    "gpt-4.1": {
+        "name": "GPT-4.1", 
+        "type": "chat",
+        "description": "Latest model with major improvements in coding and instruction following. 1M token context.",
+        "supports": ["temperature", "max_tokens", "top_p", "frequency_penalty", "presence_penalty"]
+    },
+    "gpt-4.1-mini": {
+        "name": "GPT-4.1 Mini", 
+        "type": "chat",
+        "description": "Lightweight variant with strong reasoning at lower cost and latency.",
+        "supports": ["temperature", "max_tokens", "top_p", "frequency_penalty", "presence_penalty"]
+    },
+    "gpt-4.1-nano": {
+        "name": "GPT-4.1 Nano", 
+        "type": "chat",
+        "description": "Fastest and cheapest model ideal for classification and autocompletion.",
+        "supports": ["temperature", "max_tokens", "top_p", "frequency_penalty", "presence_penalty"]
+    },
+    
+    # GPT-4.5 (Research Preview - being deprecated July 2025)
+    "gpt-4.5-preview": {
+        "name": "GPT-4.5 Preview", 
+        "type": "chat",
+        "description": "Large experimental model (being deprecated July 2025). Very expensive.",
+        "supports": ["temperature", "max_tokens", "top_p", "frequency_penalty", "presence_penalty"]
+    },
+    
+    # GPT-4o series
     "gpt-4o": {
         "name": "GPT-4o", 
         "type": "chat",
+        "description": "Flagship multimodal model with audio, vision, and text capabilities.",
         "supports": ["temperature", "max_tokens", "top_p", "frequency_penalty", "presence_penalty"]
     },
     "gpt-4o-mini": {
         "name": "GPT-4o Mini", 
         "type": "chat",
+        "description": "Faster and more affordable version of GPT-4o.",
         "supports": ["temperature", "max_tokens", "top_p", "frequency_penalty", "presence_penalty"]
     },
+    
+    # GPT-4 series
     "gpt-4": {
         "name": "GPT-4", 
         "type": "chat",
+        "description": "Original GPT-4 model for creativity and advanced reasoning.",
         "supports": ["temperature", "max_tokens", "top_p", "frequency_penalty", "presence_penalty"]
     },
     "gpt-4-turbo": {
         "name": "GPT-4 Turbo", 
         "type": "chat",
+        "description": "Enhanced GPT-4 with larger context window and improved capabilities.",
         "supports": ["temperature", "max_tokens", "top_p", "frequency_penalty", "presence_penalty"]
     },
+    
+    # GPT-3.5 series
     "gpt-3.5-turbo": {
         "name": "GPT-3.5 Turbo", 
         "type": "chat",
+        "description": "Fast and affordable model for simpler tasks.",
         "supports": ["temperature", "max_tokens", "top_p", "frequency_penalty", "presence_penalty"]
     },
-    # Reasoning models
+    
+    # Latest o-series reasoning models (April 2025)
+    "o3": {
+        "name": "o3", 
+        "type": "reasoning",
+        "description": "Most powerful reasoning model for coding, math, science, and vision. Tops SWE-Bench.",
+        "supports": ["max_completion_tokens", "reasoning_effort"]
+    },
+    "o4-mini": {
+        "name": "o4-mini", 
+        "type": "reasoning",
+        "description": "Fast, cost-efficient reasoning model. Best on AIME benchmarks.",
+        "supports": ["max_completion_tokens", "reasoning_effort"]
+    },
+    "o3-mini": {
+        "name": "o3-mini", 
+        "type": "reasoning",
+        "description": "Enhanced reasoning model with web search capabilities.",
+        "supports": ["max_completion_tokens", "reasoning_effort"]
+    },
+    
+    # Previous o-series models
     "o1": {
         "name": "o1", 
         "type": "reasoning",
+        "description": "First reasoning model with enhanced problem-solving capabilities.",
         "supports": ["max_completion_tokens"]
     },
     "o1-mini": {
         "name": "o1-mini", 
         "type": "reasoning",
+        "description": "Smaller reasoning model for cost-sensitive applications.",
         "supports": ["max_completion_tokens"]
     },
     "o1-preview": {
         "name": "o1-preview", 
         "type": "reasoning",
+        "description": "Preview version of the original o1 reasoning model.",
         "supports": ["max_completion_tokens"]
-    },
-    "o3-mini": {
-        "name": "o3-mini", 
-        "type": "reasoning",
-        "supports": ["max_completion_tokens", "reasoning_effort"]
     },
 }
 
@@ -95,71 +145,104 @@ def validate_api_key(api_key):
     except Exception as e:
         return False, str(e)
 
+def save_api_key_to_browser(api_key):
+    """Save API key to browser storage using JavaScript"""
+    encoded_key = base64.b64encode(api_key.encode()).decode()
+    js_code = f"""
+    <script>
+    localStorage.setItem('chatgpt_api_key', '{encoded_key}');
+    </script>
+    """
+    st.components.v1.html(js_code, height=0)
+
+def get_api_key_from_browser():
+    """Get API key from browser storage using JavaScript"""
+    js_code = """
+    <script>
+    const apiKey = localStorage.getItem('chatgpt_api_key');
+    if (apiKey) {
+        // Decode and set the key
+        const decodedKey = atob(apiKey);
+        document.getElementById('stored-api-key').value = decodedKey;
+    }
+    </script>
+    <input type="hidden" id="stored-api-key" />
+    """
+    # Use components to inject HTML/JS
+    components_html = st.components.v1.html(js_code, height=50)
+    return components_html
+
+def clear_api_key_from_browser():
+    """Clear API key from browser storage"""
+    js_code = """
+    <script>
+    localStorage.removeItem('chatgpt_api_key');
+    </script>
+    """
+    st.components.v1.html(js_code, height=0)
+
+# Add JavaScript to check for stored API key on page load
+def check_stored_api_key():
+    """Check for stored API key and auto-validate if found"""
+    stored_key_html = """
+    <div id="api-key-checker">
+        <script>
+        function checkStoredApiKey() {
+            const storedKey = localStorage.getItem('chatgpt_api_key');
+            if (storedKey) {
+                const decodedKey = atob(storedKey);
+                // Send key back to Streamlit
+                const event = new CustomEvent('apiKeyFound', { detail: decodedKey });
+                document.dispatchEvent(event);
+                return decodedKey;
+            }
+            return null;
+        }
+        
+        // Check immediately
+        const key = checkStoredApiKey();
+        if (key) {
+            // Create a hidden form to submit the key back to Streamlit
+            const form = document.createElement('form');
+            form.style.display = 'none';
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'stored_api_key';
+            input.value = key;
+            form.appendChild(input);
+            document.body.appendChild(form);
+            
+            // Trigger Streamlit rerun with the key
+            window.parent.postMessage({
+                type: 'streamlit:componentReady',
+                apiKey: key
+            }, '*');
+        }
+        </script>
+    </div>
+    """
+    return st.components.v1.html(stored_key_html, height=100)
+
 # Main title
 st.title("🤖 ChatGPT API Chat Interface")
 
-# JavaScript functions for local storage
-if st.session_state.check_local_storage:
-    st.session_state.check_local_storage = False
-    st.html("""
-    <script>
-    function saveApiKey(apiKey) {
-        localStorage.setItem('openai_api_key', apiKey);
-    }
+# Check for stored API key on first load
+if not st.session_state.api_key_valid:
+    # Use a simpler approach with query parameters
+    query_params = st.query_params
     
-    function getApiKey() {
-        return localStorage.getItem('openai_api_key');
-    }
-    
-    function clearApiKey() {
-        localStorage.removeItem('openai_api_key');
-    }
-    
-    // Check if there's a stored API key
-    const storedKey = getApiKey();
-    if (storedKey) {
-        // Send the stored key to Streamlit
-        window.parent.postMessage({
-            type: 'streamlit:setComponentValue',
-            value: storedKey
-        }, '*');
-    }
-    
-    // Set up message listener for saving API keys
-    window.addEventListener('message', function(event) {
-        if (event.data && event.data.type === 'saveApiKey') {
-            saveApiKey(event.data.key);
-        } else if (event.data && event.data.type === 'clearApiKey') {
-            clearApiKey();
-        }
-    });
-    </script>
-    """)
-
-# Check for stored API key in local storage
-stored_key_placeholder = st.empty()
-if not st.session_state.api_key_valid and not st.session_state.stored_api_key:
-    with stored_key_placeholder:
-        # Create a hidden component to receive the stored API key
-        key_from_storage = st.text_input("", key="hidden_api_key", label_visibility="hidden")
-        if key_from_storage and key_from_storage.startswith("sk-"):
-            st.session_state.stored_api_key = key_from_storage
-            # Auto-validate the stored key
-            with st.spinner("Validating stored API key..."):
-                is_valid, result = validate_api_key(key_from_storage)
-                if is_valid:
-                    st.session_state.api_key_valid = True
-                    st.session_state.client = result
-                    st.success("✅ Welcome back! Your stored API key is still valid.")
-                    st.rerun()
-                else:
-                    # Invalid stored key, clear it
-                    st.session_state.stored_api_key = None
-                    st.html("""<script>
-                    parent.postMessage({type: 'clearApiKey'}, '*');
-                    </script>""")
-
-stored_key_placeholder.empty()
+    # Check if we have a stored key in query params (for internal use)
+    if "stored_key" in query_params and query_params["stored_key"] and not st.session_state.api_key_valid:
+        stored_key = query_params["stored_key"]
+        with st.spinner("Validating stored API key..."):
+            is_valid, result = validate_api_key(stored_key)
+            if is_valid:
+                st.session_state.api_key_valid = True
+                st.session_state.client = result
+                st.success("✅ Welcome back! Your API key is still valid.")
+                # Clear the query param for security
+                st.query_params.clear()
+                st.rerun()
 
 # API Key Input Section
 if not st.session_state.api_key_valid:
@@ -170,30 +253,84 @@ if not st.session_state.api_key_valid:
     2. Create a new secret key
     3. Copy and paste it below
     
-    **Your API key is stored only in your current session and is never saved or shared.**
+    **Your API key will be stored locally in your browser for convenience.**
     """)
+    
+    # Check for return user
+    if st.checkbox("I'm a returning user", help="Check this if you've used this app before on this browser"):
+        components_html = """
+        <div>
+            <script>
+            const storedKey = localStorage.getItem('chatgpt_api_key');
+            if (storedKey) {
+                const decodedKey = atob(storedKey);
+                document.getElementById('api-key-display').innerHTML = 
+                    '<p style="color: green;">✅ Found stored API key! Click "Use Stored Key" below.</p>';
+                document.getElementById('use-stored-btn').style.display = 'block';
+                document.getElementById('use-stored-btn').onclick = function() {
+                    // Set the key in a hidden input to send to Streamlit
+                    document.getElementById('hidden-stored-key').value = decodedKey;
+                    // Submit the form
+                    document.getElementById('stored-key-form').submit();
+                };
+            } else {
+                document.getElementById('api-key-display').innerHTML = 
+                    '<p style="color: orange;">⚠️ No stored API key found. Please enter your key below.</p>';
+            }
+            </script>
+            <div id="api-key-display"></div>
+            <button id="use-stored-btn" style="display: none; background-color: #4CAF50; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer;">Use Stored Key</button>
+            <form id="stored-key-form" style="display: none;">
+                <input type="hidden" id="hidden-stored-key" name="stored_key" />
+            </form>
+        </div>
+        """
+        
+        stored_key_component = st.components.v1.html(components_html, height=100)
+        
+        # Check if stored key was submitted
+        if st.query_params.get("stored_key"):
+            stored_key = st.query_params["stored_key"]
+            with st.spinner("Validating stored API key..."):
+                is_valid, result = validate_api_key(stored_key)
+                if is_valid:
+                    st.session_state.api_key_valid = True
+                    st.session_state.client = result
+                    st.success("✅ Welcome back! Your stored API key is valid.")
+                    st.query_params.clear()
+                    st.rerun()
+                else:
+                    st.error("❌ Stored API key is no longer valid. Please enter a new one.")
+                    st.query_params.clear()
+    
+    st.markdown("---")
     
     api_key = st.text_input(
         "OpenAI API Key", 
         type="password", 
         placeholder="sk-...",
-        help="Your API key will be used for this session only and is not stored anywhere."
+        help="Your API key will be securely stored in your browser's local storage."
     )
     
     col1, col2 = st.columns([1, 3])
     with col1:
-        if st.button("Validate API Key", type="primary"):
+        if st.button("Validate & Save API Key", type="primary"):
             if api_key:
                 with st.spinner("Validating API key..."):
                     is_valid, result = validate_api_key(api_key)
                     if is_valid:
                         st.session_state.api_key_valid = True
                         st.session_state.client = result
-                        st.session_state.stored_api_key = api_key
-                        # Save to local storage
-                        st.html(f"""<script>
-                        parent.postMessage({{type: 'saveApiKey', key: '{api_key}'}}, '*');
-                        </script>""")
+                        # Save to browser storage
+                        save_html = f"""
+                        <script>
+                        const apiKey = '{api_key}';
+                        const encodedKey = btoa(apiKey);
+                        localStorage.setItem('chatgpt_api_key', encodedKey);
+                        alert('API key saved successfully!');
+                        </script>
+                        """
+                        st.components.v1.html(save_html, height=0)
                         st.success("✅ API key validated and saved successfully!")
                         st.rerun()
                     else:
@@ -215,23 +352,25 @@ with col1:
     if st.button("Change API Key", use_container_width=True):
         st.session_state.api_key_valid = False
         st.session_state.client = None
-        st.session_state.stored_api_key = None
         st.session_state.messages = [
             {"role": "system", "content": "You are ChatGPT, a large language model."}
         ]
         st.rerun()
 with col2:
     if st.button("Clear Stored Key", use_container_width=True):
+        # Clear from browser storage
+        clear_html = """
+        <script>
+        localStorage.removeItem('chatgpt_api_key');
+        alert('Stored API key cleared!');
+        </script>
+        """
+        st.components.v1.html(clear_html, height=0)
         st.session_state.api_key_valid = False
         st.session_state.client = None
-        st.session_state.stored_api_key = None
         st.session_state.messages = [
             {"role": "system", "content": "You are ChatGPT, a large language model."}
         ]
-        # Clear from local storage
-        st.html("""<script>
-        parent.postMessage({type: 'clearApiKey'}, '*');
-        </script>""")
         st.rerun()
 
 # Model selection
@@ -242,6 +381,11 @@ model_key = st.sidebar.selectbox(
 )
 
 selected_model = MODELS_CONFIG[model_key]
+
+# Show model description
+st.sidebar.markdown(f"**{selected_model['name']}**")
+st.sidebar.markdown(f"*{selected_model.get('description', 'No description available')}*")
+st.sidebar.markdown(f"**Type:** {selected_model['type'].title()}")
 
 # Model parameters based on model type
 st.sidebar.markdown("### Model Parameters")
