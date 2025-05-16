@@ -373,39 +373,119 @@ with col2:
         ]
         st.rerun()
 
-# Model selection
+# Model selection with categorization
+st.sidebar.markdown("### Select Model")
+
+# Add explanatory text about model types
+st.sidebar.markdown("""
+<div style="background-color: #f0f2f6; padding: 8px; border-radius: 5px; margin-bottom: 10px; font-size: 12px;">
+<strong>Model Types:</strong><br>
+🧠 <strong>o-series models</strong> use advanced reasoning for complex problems<br>
+💬 <strong>GPT models</strong> are optimized for general conversation and tasks
+</div>
+""", unsafe_allow_html=True)
+
+# Get reasoning and chat models separately for better organization
+reasoning_models = {k: v for k, v in MODELS_CONFIG.items() if v["type"] == "reasoning"}
+chat_models = {k: v for k, v in MODELS_CONFIG.items() if v["type"] == "chat"}
+
+# Custom format function that shows model type
+def format_model_name(model_key):
+    model = MODELS_CONFIG[model_key]
+    if model["type"] == "reasoning":
+        return f"🧠 {model['name']}"
+    else:
+        return f"💬 {model['name']}"
+
 model_key = st.sidebar.selectbox(
-    "Select Model", 
+    "Choose a model", 
     list(MODELS_CONFIG.keys()),
-    format_func=lambda x: MODELS_CONFIG[x]["name"]
+    format_func=format_model_name
 )
 
 selected_model = MODELS_CONFIG[model_key]
 
-# Show model description
-st.sidebar.markdown(f"**{selected_model['name']}**")
-st.sidebar.markdown(f"*{selected_model.get('description', 'No description available')}*")
-st.sidebar.markdown(f"**Type:** {selected_model['type'].title()}")
+# Model description as hover tooltip with info icon
+col1, col2 = st.sidebar.columns([3, 1])
+with col1:
+    st.markdown(f"**{selected_model['name']}** - {selected_model['type'].title()}")
+with col2:
+    # Add info icon with hover tooltip
+    st.markdown(f"""
+    <div class="tooltip">
+        <span style="font-size: 18px; color: #0066cc; cursor: help;">ℹ️</span>
+        <span class="tooltiptext">{selected_model.get('description', 'No description available')}</span>
+    </div>
+    """, unsafe_allow_html=True)
 
-# Model parameters based on model type
+# Model parameters based on model type with hover descriptions
 st.sidebar.markdown("### Model Parameters")
+
+# Helper function to create parameter with tooltip
+def create_parameter_with_tooltip(label, tooltip, widget_func, *args, **kwargs):
+    st.sidebar.markdown(f"""
+    <div class="tooltip">
+        <span style="margin-right: 5px;">{label}</span>
+        <span style="font-size: 12px; color: #888; cursor: help;">ℹ️</span>
+        <span class="tooltiptext">{tooltip}</span>
+    </div>
+    """, unsafe_allow_html=True)
+    return widget_func("", *args, **kwargs)
 
 # Common parameters for all models
 if "max_tokens" in selected_model["supports"]:
-    max_tokens = st.sidebar.slider("Max Tokens", 100, 4000, 1000)
+    max_tokens = create_parameter_with_tooltip(
+        "Max Tokens",
+        "Maximum number of tokens to generate. Higher values allow longer responses but cost more. Lower values create shorter, more concise responses.",
+        st.sidebar.slider,
+        100, 4000, 1000
+    )
 elif "max_completion_tokens" in selected_model["supports"]:
-    max_completion_tokens = st.sidebar.slider("Max Completion Tokens", 100, 32000, 4000)
+    max_completion_tokens = create_parameter_with_tooltip(
+        "Max Completion Tokens",
+        "Maximum tokens in the response for reasoning models. Higher values allow more detailed reasoning and longer explanations.",
+        st.sidebar.slider,
+        100, 32000, 4000
+    )
 
 # Parameters for chat models
 if selected_model["type"] == "chat":
-    temperature = st.sidebar.slider("Temperature", 0.0, 1.0, 0.7)
-    top_p = st.sidebar.slider("Top P", 0.0, 1.0, 1.0)
-    freq_penalty = st.sidebar.slider("Frequency Penalty", 0.0, 2.0, 0.0)
-    pres_penalty = st.sidebar.slider("Presence Penalty", 0.0, 2.0, 0.0)
+    temperature = create_parameter_with_tooltip(
+        "Temperature",
+        "Controls randomness. Lower values (0.0) make responses more focused and deterministic. Higher values (1.0) make responses more creative and varied.",
+        st.sidebar.slider,
+        0.0, 1.0, 0.7
+    )
+    
+    top_p = create_parameter_with_tooltip(
+        "Top P",
+        "Controls diversity via nucleus sampling. Lower values focus on most likely tokens. Higher values consider more possibilities for creative responses.",
+        st.sidebar.slider,
+        0.0, 1.0, 1.0
+    )
+    
+    freq_penalty = create_parameter_with_tooltip(
+        "Frequency Penalty",
+        "Reduces repetition based on token frequency. Higher values discourage repeating phrases and words.",
+        st.sidebar.slider,
+        0.0, 2.0, 0.0
+    )
+    
+    pres_penalty = create_parameter_with_tooltip(
+        "Presence Penalty",
+        "Encourages discussing new topics. Higher values make the model talk about different subjects rather than staying on the same topic.",
+        st.sidebar.slider,
+        0.0, 2.0, 0.0
+    )
 
 # Parameters for reasoning models
 if selected_model["type"] == "reasoning" and "reasoning_effort" in selected_model["supports"]:
-    reasoning_effort = st.sidebar.selectbox("Reasoning Effort", ["low", "medium", "high"], index=1)
+    reasoning_effort = create_parameter_with_tooltip(
+        "Reasoning Effort",
+        "Controls how much thinking time the model uses. Higher effort leads to better quality but slower and more expensive responses.",
+        st.sidebar.selectbox,
+        ["low", "medium", "high"], index=1
+    )
 
 # File uploader
 st.sidebar.markdown("### Upload a File")
@@ -587,7 +667,7 @@ if st.session_state.waiting_for_response and st.session_state.pending_api_params
         st.session_state.waiting_for_response = False
         st.session_state.pending_api_params = None
 
-# Custom CSS for better styling
+# Custom CSS for better styling and tooltips
 st.markdown("""
 <style>
     .stTextArea textarea {
@@ -606,6 +686,48 @@ st.markdown("""
         background-color: #f0f2f6;
         margin-right: 20px;
     }
+    
+    /* Tooltip styles */
+    .tooltip {
+        position: relative;
+        display: inline-block;
+    }
+    
+    .tooltip .tooltiptext {
+        visibility: hidden;
+        width: 250px;
+        background-color: #555;
+        color: white;
+        text-align: center;
+        border-radius: 6px;
+        padding: 8px;
+        position: absolute;
+        z-index: 1;
+        bottom: 125%;
+        left: 50%;
+        margin-left: -125px;
+        opacity: 0;
+        transition: opacity 0.3s;
+        font-size: 12px;
+        line-height: 1.4;
+    }
+    
+    .tooltip .tooltiptext::after {
+        content: "";
+        position: absolute;
+        top: 100%;
+        left: 50%;
+        margin-left: -5px;
+        border-width: 5px;
+        border-style: solid;
+        border-color: #555 transparent transparent transparent;
+    }
+    
+    .tooltip:hover .tooltiptext {
+        visibility: visible;
+        opacity: 1;
+    }
+    
     @keyframes pulse {
         0% {
             opacity: 1;
