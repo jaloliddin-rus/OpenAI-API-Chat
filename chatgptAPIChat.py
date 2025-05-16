@@ -9,6 +9,7 @@ from openai import OpenAI, OpenAIError
 import time
 import base64
 import json
+from streamlit_javascript import st_javascript
 
 # Configure page layout
 st.set_page_config(page_title="ChatGPT API Interface", layout="wide")
@@ -233,24 +234,26 @@ st.title("🤖 ChatGPT API Chat Interface")
 
 # Check for stored API key on first load
 if not st.session_state.api_key_valid:
-    # Use a simpler approach with query parameters
-    query_params = st.query_params
-    
-    # Check if we have a stored key in query params (for internal use)
-    if "stored_key" in query_params and query_params["stored_key"] and not st.session_state.api_key_valid:
-        stored_key = query_params["stored_key"]
+    # Try retrieving key from browser's localStorage via JavaScript
+    stored_key = st_javascript("await localStorage.getItem('chatgpt_api_key');")
+
+    if stored_key:
+        # Optionally decode if you had saved it base64-encoded
+        try:
+            decoded_key = base64.b64decode(stored_key).decode()
+        except Exception:
+            decoded_key = stored_key  # Fallback: treat as plain text
+
         with st.spinner("Validating stored API key..."):
-            is_valid, result = validate_api_key(stored_key)
+            is_valid, result = validate_api_key(decoded_key)
             if is_valid:
                 st.session_state.api_key_valid = True
                 st.session_state.client = result
-                st.success("✅ Welcome back! Your API key is still valid.")
-                # Clear the query param for security
-                st.query_params.clear()
+                st.success("✅ Stored API key is valid.")
                 st.rerun()
             else:
-                st.error("❌ Stored API key is no longer valid. Please enter a new one.")
-                st.query_params.clear()
+                st.warning("⚠️ Found stored API key, but it is invalid. Please enter a new one.")
+
 
 # API Key Input Section
 if not st.session_state.api_key_valid:
