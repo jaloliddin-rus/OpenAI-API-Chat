@@ -26,6 +26,10 @@ if "api_key_valid" not in st.session_state:
     st.session_state.api_key_valid = False
 if "client" not in st.session_state:
     st.session_state.client = None
+if "stored_api_key" not in st.session_state:
+    st.session_state.stored_api_key = None
+if "use_stored_key" not in st.session_state:
+    st.session_state.use_stored_key = False
 
 # Model configurations with their specific parameters
 MODELS_CONFIG = {
@@ -227,10 +231,40 @@ def check_stored_api_key():
 # Main title
 st.title("🤖 ChatGPT API Chat Interface")
 
-# Check for stored API key on first load
+# Check for stored API key on first load or if user selected to use stored key
 if not st.session_state.api_key_valid:
     # Use a simpler approach with query parameters
     query_params = st.query_params
+    
+    # Check if user is trying to use stored key
+    if st.session_state.get('use_stored_key', False) or query_params.get("use_stored") == "true":
+        # Get stored key via JavaScript component
+        get_key_script = """
+        <script>
+        function retrieveStoredKey() {
+            const storedKey = localStorage.getItem('chatgpt_api_key');
+            if (storedKey && storedKey !== '') {
+                try {
+                    const decodedKey = atob(storedKey);
+                    if (decodedKey && decodedKey.startsWith('sk-')) {
+                        // Use URL to pass the key securely
+                        const url = new URL(window.location);
+                        url.searchParams.set('stored_key', decodedKey);
+                        url.searchParams.delete('use_stored');
+                        window.location.href = url.toString();
+                    }
+                } catch (error) {
+                    alert('Error retrieving stored key: ' + error.message);
+                }
+            } else {
+                alert('No valid stored API key found');
+            }
+        }
+        retrieveStoredKey();
+        </script>
+        """
+        components.html(get_key_script, height=0, key="retrieve_stored_key")
+        st.session_state.use_stored_key = False  # Reset flag
     
     # Check if we have a stored key in query params (for internal use)
     if "stored_key" in query_params and query_params["stored_key"] and not st.session_state.api_key_valid:
@@ -244,6 +278,9 @@ if not st.session_state.api_key_valid:
                 # Clear the query param for security
                 st.query_params.clear()
                 st.rerun()
+            else:
+                st.error("❌ Stored API key is no longer valid. Please enter a new one.")
+                st.query_params.clear()
 
 # API Key Input Section
 if not st.session_state.api_key_valid:
@@ -259,53 +296,87 @@ if not st.session_state.api_key_valid:
     
     # Check for return user
     if st.checkbox("I'm a returning user", help="Check this if you've used this app before on this browser"):
-        # Create a container for the returning user content
-        returning_user_container = st.container()
+        st.markdown("**Checking for stored API key...**")
         
-        components_html = """
-        <div style="padding: 10px; border: 1px solid #ddd; border-radius: 5px; background-color: #f9f9f9;">
+        # Simple button approach - when clicked, it will store the key in session state
+        if st.button("🔍 Check for Stored API Key", key="check_stored_key"):
+            # Use JavaScript to get the stored key and validate it
+            get_stored_key_html = """
             <script>
-            function checkForStoredKey() {
+            function getStoredApiKey() {
                 const storedKey = localStorage.getItem('chatgpt_api_key');
-                const displayDiv = document.getElementById('api-key-display');
-                const useBtn = document.getElementById('use-stored-btn');
-                
                 if (storedKey && storedKey !== '') {
                     try {
                         const decodedKey = atob(storedKey);
                         if (decodedKey && decodedKey.startsWith('sk-')) {
-                            displayDiv.innerHTML = '<p style="color: green; margin: 10px 0;">✅ Found stored API key! Click "Use Stored Key" below.</p>';
-                            useBtn.style.display = 'block';
-                            useBtn.onclick = function() {
-                                // Set the key in URL params to send to Streamlit
-                                const url = new URL(window.location);
-                                url.searchParams.set('stored_key', decodedKey);
-                                window.location = url;
-                            };
+                            // Send key back to parent
+                            window.parent.postMessage({
+                                type: 'streamlit:componentReady',
+                                apiKey: decodedKey
+                            }, '*');
+                            document.getElementById('key-status').innerHTML = 
+                                '<p style="color: green;">✅ Found valid API key!</p>';
+                            return decodedKey;
                         } else {
-                            displayDiv.innerHTML = '<p style="color: orange; margin: 10px 0;">⚠️ Invalid stored API key format. Please enter your key below.</p>';
+                            document.getElementById('key-status').innerHTML = 
+                                '<p style="color: orange;">⚠️ Invalid API key format</p>';
                         }
                     } catch (error) {
-                        console.error('Error decoding stored key:', error);
-                        displayDiv.innerHTML = '<p style="color: red; margin: 10px 0;">❌ Error reading stored key. Please enter your key below.</p>';
+                        document.getElementById('key-status').innerHTML = 
+                            '<p style="color: red;">❌ Error decoding key</p>';
                     }
                 } else {
-                    displayDiv.innerHTML = '<p style="color: gray; margin: 10px 0;">⚠️ No stored API key found. Please enter your key below.</p>';
+                    document.getElementById('key-status').innerHTML = 
+                        '<p style="color: gray;">⚠️ No stored API key found</p>';
+                }
+                return null;
+            }
+            
+            // Get the key immediately
+            getStoredApiKey();
+            </script>
+            <div id="key-status">Checking...</div>
+            """
+            key_check_result = components.html(get_stored_key_html, height=100, key="key_checker")
+        
+        # Alternative: Use stored key button
+        if st.button("🔑 Use Stored API Key", help="Click this if you've checked and found a stored key", key="use_stored_key_btn"):
+            # Try to get and validate stored key
+            validate_stored_key_html = """
+            <script>
+            function validateAndUseStoredKey() {
+                const storedKey = localStorage.getItem('chatgpt_api_key');
+                if (storedKey && storedKey !== '') {
+                    try {
+                        const decodedKey = atob(storedKey);
+                        if (decodedKey && decodedKey.startsWith('sk-')) {
+                            // Send the key to Streamlit via session state update
+                            window.parent.postMessage({
+                                type: 'streamlit:setComponentValue',
+                                value: {useStoredKey: true, apiKey: decodedKey}
+                            }, '*');
+                            
+                            // Also try URL approach as backup
+                            const url = new URL(window.location);
+                            url.searchParams.set('use_stored', 'true');
+                            url.searchParams.set('key_hint', 'stored');
+                            window.location.href = url.toString();
+                        }
+                    } catch (error) {
+                        alert('Error using stored key: ' + error.message);
+                    }
+                } else {
+                    alert('No stored API key found');
                 }
             }
             
-            // Check immediately when the script loads
-            document.addEventListener('DOMContentLoaded', checkForStoredKey);
-            
-            // Also check after a brief delay to ensure DOM is ready
-            setTimeout(checkForStoredKey, 100);
+            validateAndUseStoredKey();
             </script>
-            <div id="api-key-display">Checking for stored API key...</div>
-            <button id="use-stored-btn" style="display: none; background-color: #4CAF50; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin-top: 10px;">Use Stored Key</button>
-        </div>
-        """
-        
-        stored_key_component = components.html(components_html, height=150)
+            """
+            components.html(validate_stored_key_html, height=50, key="use_stored_validator")
+            
+            # Also try to get the key directly for validation
+            st.session_state.use_stored_key = True
         
         # Check if stored key was submitted
         if st.query_params.get("stored_key"):
@@ -717,7 +788,7 @@ st.markdown("""
     
     .tooltip .tooltiptext {
         visibility: hidden;
-        width: 280px;
+        width: 320px;
         background-color: #333;
         color: white;
         text-align: left;
@@ -725,9 +796,9 @@ st.markdown("""
         padding: 10px;
         position: absolute;
         z-index: 9999;
-        bottom: 120%;
-        left: 50%;
-        margin-left: -140px;
+        top: 50%;
+        left: 25px;
+        transform: translateY(-50%);
         opacity: 0;
         transition: opacity 0.3s;
         font-size: 13px;
@@ -736,33 +807,20 @@ st.markdown("""
         word-wrap: break-word;
     }
     
-    .tooltip .tooltiptext::after {
+    .tooltip .tooltiptext::before {
         content: "";
         position: absolute;
-        top: 100%;
-        left: 50%;
-        margin-left: -5px;
+        top: 50%;
+        left: -5px;
+        margin-top: -5px;
         border-width: 5px;
         border-style: solid;
-        border-color: #333 transparent transparent transparent;
+        border-color: transparent #333 transparent transparent;
     }
     
     .tooltip:hover .tooltiptext {
         visibility: visible;
         opacity: 1;
-    }
-    
-    /* Special positioning for sidebar tooltips */
-    .stSidebar .tooltip .tooltiptext {
-        left: auto;
-        right: -150px;
-        margin-left: 0;
-        width: 320px;
-    }
-    
-    .stSidebar .tooltip .tooltiptext::after {
-        left: auto;
-        right: 160px;
     }
     
     @keyframes pulse {
