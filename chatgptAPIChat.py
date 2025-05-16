@@ -329,41 +329,45 @@ if not st.session_state.api_key_valid:
         
         # Alternative: Use stored key button
         if st.button("🔑 Use Stored API Key", help="Click this if you've checked and found a stored key", key="use_stored_key_btn"):
-            # Create a placeholder for feedback
-            feedback_placeholder = st.empty()
+            # Much simpler approach - directly get the key using JavaScript and URL redirect
+            st.markdown("Getting your stored API key...")
             
-            with feedback_placeholder:
-                st.info("🔍 Retrieving stored API key...")
-            
-            # Use JavaScript to get the stored key and redirect
-            use_key_html = """
+            redirect_script = """
             <script>
-            function useStoredApiKey() {
+            // Function to get stored key and redirect
+            function useStoredKey() {
                 const storedKey = localStorage.getItem('chatgpt_api_key');
-                if (storedKey && storedKey !== '') {
-                    try {
-                        const decodedKey = atob(storedKey);
-                        if (decodedKey && decodedKey.startsWith('sk-')) {
-                            // Redirect with the key in URL
-                            const url = new URL(window.location);
-                            url.searchParams.set('stored_key', decodedKey);
-                            window.location.href = url.toString();
-                        } else {
-                            alert('Invalid stored API key format');
-                        }
-                    } catch (error) {
-                        alert('Error retrieving stored key: ' + error.message);
+                
+                if (!storedKey) {
+                    alert('No stored API key found. Please enter your key manually.');
+                    return;
+                }
+                
+                try {
+                    const decodedKey = atob(storedKey);
+                    
+                    if (!decodedKey.startsWith('sk-')) {
+                        alert('Stored key appears to be invalid. Please enter your key manually.');
+                        return;
                     }
-                } else {
-                    alert('No stored API key found. Please check that you have one saved first.');
+                    
+                    // Redirect with the key
+                    const currentUrl = new URL(window.location);
+                    currentUrl.searchParams.set('stored_key', decodedKey);
+                    window.location.href = currentUrl.toString();
+                    
+                } catch (error) {
+                    alert('Error reading stored key: ' + error.message);
                 }
             }
             
-            // Execute the function immediately
-            useStoredApiKey();
+            // Execute immediately
+            useStoredKey();
             </script>
             """
-            components.html(use_key_html, height=0)
+            
+            # Execute the JavaScript with minimal height
+            components.html(redirect_script, height=20)
         
         # Check if stored key was submitted
         if st.query_params.get("stored_key"):
