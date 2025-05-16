@@ -166,85 +166,54 @@ if not st.session_state.api_key_valid:
     st.markdown("If you've used this app before on this browser, you may have a stored API key.")
     
     if st.button("🔍 Check for Stored API Key", type="secondary"):
-        # JavaScript to check and validate stored key
         check_script = """
         <div id="key-check-result"></div>
         <script>
         function checkAndValidateStoredKey() {
             const resultDiv = document.getElementById('key-check-result');
             const storedKey = localStorage.getItem('chatgpt_api_key');
-            
             if (!storedKey) {
-                resultDiv.innerHTML = `
-                    <div style="color: #666; padding: 15px; background-color: #f5f5f5; border-radius: 8px; margin: 10px 0;">
-                        <strong>ℹ️ No stored API key found</strong><br>
-                        <em>Please enter your API key below.</em>
-                    </div>
-                `;
+                resultDiv.innerHTML = `<div style='color: #666;'>No stored key found</div>`;
                 return;
             }
-            
             try {
                 const decodedKey = atob(storedKey);
                 if (!decodedKey.startsWith('sk-')) {
-                    resultDiv.innerHTML = `
-                        <div style="color: #ff6b35; padding: 15px; background-color: #ffebee; border-radius: 8px; margin: 10px 0;">
-                            <strong>⚠️ Invalid stored key format</strong><br>
-                            <em>The stored key doesn't appear to be valid.</em>
-                        </div>
-                    `;
+                    resultDiv.innerHTML = `<div style='color: #ff6b35;'>Invalid stored key format</div>`;
                     return;
                 }
-                
-                // Show the key (partially masked) and provide option to use it
+                // Show masked key and button to use it
                 const maskedKey = decodedKey.substring(0, 7) + '...' + decodedKey.substring(decodedKey.length - 4);
                 resultDiv.innerHTML = `
-                    <div style="color: #2e7d32; padding: 15px; background-color: #e8f5e9; border-radius: 8px; margin: 10px 0;">
-                        <strong>✅ Found stored API key!</strong><br>
-                        <em>Key: ${maskedKey}</em><br><br>
-                        <form id="use-key-form" method="get" style="display: inline;">
-                            <input type="hidden" name="use_stored_key" value="true">
-                            <input type="hidden" name="stored_key" value="${decodedKey}">
-                            <button type="submit" 
-                                    style="background-color: #1976d2; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-size: 16px;">
-                                🔑 Use This Key
-                            </button>
-                        </form>
-                        <button onclick="clearStoredKey()" 
-                                style="background-color: #d32f2f; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-size: 16px; margin-left: 10px;">
-                            🗑️ Remove Key
-                        </button>
+                    <div style='color: #2e7d32;'>
+                    Found stored key: <b>${maskedKey}</b>
+                    <button id='useStoredKeyBtn' style='margin-left:10px;'>Use This Key</button>
+                    <button onclick='clearStoredKey()' style='margin-left:10px;'>Remove Key</button>
                     </div>
                 `;
-            } catch (error) {
-                resultDiv.innerHTML = `
-                    <div style="color: #d32f2f; padding: 15px; background-color: #ffebee; border-radius: 8px; margin: 10px 0;">
-                        <strong>❌ Error reading stored key</strong><br>
-                        <em>Error: ${error.message}</em>
-                    </div>
-                `;
+                // Attach handler
+                document.getElementById('useStoredKeyBtn').onclick = function() {
+                    const params = new URLSearchParams(window.location.search);
+                    params.set('use_stored_key', 'true');
+                    params.set('stored_key', decodedKey);
+                    window.location.search = params.toString();
+                };
+            } catch (err) {
+                resultDiv.innerHTML = `<div style='color: #d32f2f;'>Error reading key: ${err.message}</div>`;
             }
         }
-        
         function clearStoredKey() {
             localStorage.removeItem('chatgpt_api_key');
-            document.getElementById('key-check-result').innerHTML = `
-                <div style="color: #2e7d32; padding: 15px; background-color: #e8f5e9; border-radius: 8px; margin: 10px 0;">
-                    <strong>✅ Stored API key removed</strong><br>
-                    <em>You can now enter a new key below.</em>
-                </div>
-            `;
+            document.getElementById('key-check-result').innerHTML = `<div>Key removed.</div>`;
         }
-        
-        // Run the check when the page loads
         checkAndValidateStoredKey();
         </script>
         """
         components.html(check_script, height=120)
     
-    # Check if user clicked "Use Stored Key"
-    if st.query_params.get("use_stored_key") == "true":
-        stored_key = st.query_params.get("stored_key")
+    params = st.query_params
+    if params.get("use_stored_key") == "true":
+        stored_key = params.get("stored_key")
         if stored_key:
             with st.spinner("Validating stored API key..."):
                 is_valid, result = validate_api_key(stored_key)
@@ -252,12 +221,11 @@ if not st.session_state.api_key_valid:
                     st.session_state.api_key_valid = True
                     st.session_state.client = result
                     st.success("✅ Welcome back! Your stored API key is valid.")
-                    # Clear query params
+                    # Clear query params for security
                     st.query_params.clear()
                     st.rerun()
                 else:
                     st.error(f"❌ Stored API key is invalid: {result}")
-                    # Clear the invalid key from browser storage
                     clear_invalid_key_script = """
                     <script>
                     localStorage.removeItem('chatgpt_api_key');
@@ -265,6 +233,7 @@ if not st.session_state.api_key_valid:
                     """
                     components.html(clear_invalid_key_script, height=0)
                     st.query_params.clear()
+
     
     st.markdown("---")
     st.markdown("#### ✍️ Enter New API Key")
@@ -290,17 +259,15 @@ if not st.session_state.api_key_valid:
                         st.session_state.client = result
                         
                         if save_key:
-                            # Save to browser storage
                             save_script = f"""
                             <script>
-                            try {{
-                                const apiKey = `{api_key}`;
-                                const encodedKey = btoa(apiKey);
-                                localStorage.setItem('chatgpt_api_key', encodedKey);
-                                console.log('API key saved to localStorage');
-                            }} catch (error) {{
-                                console.error('Error saving API key:', error);
-                            }}
+                                try {{
+                                    const apiKey = `{api_key}`;
+                                    const encodedKey = btoa(apiKey);
+                                    localStorage.setItem('chatgpt_api_key', encodedKey);
+                                }} catch (error) {{
+                                    console.error('Error saving API key:', error);
+                                }}
                             </script>
                             """
                             components.html(save_script, height=0)
