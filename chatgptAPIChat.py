@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 from io import BytesIO
 from pathlib import Path
 from tenacity import retry, wait_random_exponential, stop_after_attempt
@@ -153,7 +154,7 @@ def save_api_key_to_browser(api_key):
     localStorage.setItem('chatgpt_api_key', '{encoded_key}');
     </script>
     """
-    st.components.v1.html(js_code, height=0)
+    components.html(js_code, height=0)
 
 def get_api_key_from_browser():
     """Get API key from browser storage using JavaScript"""
@@ -169,7 +170,7 @@ def get_api_key_from_browser():
     <input type="hidden" id="stored-api-key" />
     """
     # Use components to inject HTML/JS
-    components_html = st.components.v1.html(js_code, height=50)
+    components_html = components.html(js_code, height=50)
     return components_html
 
 def clear_api_key_from_browser():
@@ -179,7 +180,7 @@ def clear_api_key_from_browser():
     localStorage.removeItem('chatgpt_api_key');
     </script>
     """
-    st.components.v1.html(js_code, height=0)
+    components.html(js_code, height=0)
 
 # Add JavaScript to check for stored API key on page load
 def check_stored_api_key():
@@ -221,7 +222,7 @@ def check_stored_api_key():
         </script>
     </div>
     """
-    return st.components.v1.html(stored_key_html, height=100)
+    return components.html(stored_key_html, height=100)
 
 # Main title
 st.title("🤖 ChatGPT API Chat Interface")
@@ -286,7 +287,7 @@ if not st.session_state.api_key_valid:
         </div>
         """
         
-        stored_key_component = st.components.v1.html(components_html, height=100)
+        stored_key_component = components.html(components_html, height=100)
         
         # Check if stored key was submitted
         if st.query_params.get("stored_key"):
@@ -330,7 +331,7 @@ if not st.session_state.api_key_valid:
                         alert('API key saved successfully!');
                         </script>
                         """
-                        st.components.v1.html(save_html, height=0)
+                        components.html(save_html, height=0)
                         st.success("✅ API key validated and saved successfully!")
                         st.rerun()
                     else:
@@ -365,7 +366,7 @@ with col2:
         alert('Stored API key cleared!');
         </script>
         """
-        st.components.v1.html(clear_html, height=0)
+        components.html(clear_html, height=0)
         st.session_state.api_key_valid = False
         st.session_state.client = None
         st.session_state.messages = [
@@ -375,15 +376,6 @@ with col2:
 
 # Model selection with categorization
 st.sidebar.markdown("### Select Model")
-
-# Add explanatory text about model types
-st.sidebar.markdown("""
-<div style="background-color: #f0f2f6; padding: 8px; border-radius: 5px; margin-bottom: 10px; font-size: 12px;">
-<strong>Model Types:</strong><br>
-🧠 <strong>o-series models</strong> use advanced reasoning for complex problems<br>
-💬 <strong>GPT models</strong> are optimized for general conversation and tasks
-</div>
-""", unsafe_allow_html=True)
 
 # Get reasoning and chat models separately for better organization
 reasoning_models = {k: v for k, v in MODELS_CONFIG.items() if v["type"] == "reasoning"}
@@ -406,17 +398,16 @@ model_key = st.sidebar.selectbox(
 selected_model = MODELS_CONFIG[model_key]
 
 # Model description as hover tooltip with info icon
-col1, col2 = st.sidebar.columns([3, 1])
-with col1:
-    st.markdown(f"**{selected_model['name']}** - {selected_model['type'].title()}")
-with col2:
-    # Add info icon with hover tooltip
-    st.markdown(f"""
-    <div class="tooltip">
-        <span style="font-size: 18px; color: #0066cc; cursor: help;">ℹ️</span>
+st.sidebar.markdown(f"""
+<div style="margin-bottom: 15px;">
+    <span style="font-weight: bold;">{selected_model['name']}</span> 
+    <span style="color: #666;">- {selected_model['type'].title()}</span>
+    <div class="tooltip" style="display: inline-block; margin-left: 5px;">
+        <span style="font-size: 16px; color: #0066cc; cursor: help;">ℹ️</span>
         <span class="tooltiptext">{selected_model.get('description', 'No description available')}</span>
     </div>
-    """, unsafe_allow_html=True)
+</div>
+""", unsafe_allow_html=True)
 
 # Model parameters based on model type with hover descriptions
 st.sidebar.markdown("### Model Parameters")
@@ -424,10 +415,12 @@ st.sidebar.markdown("### Model Parameters")
 # Helper function to create parameter with tooltip
 def create_parameter_with_tooltip(label, tooltip, widget_func, key, *args, **kwargs):
     st.sidebar.markdown(f"""
-    <div class="tooltip">
-        <span style="margin-right: 5px;">{label}</span>
-        <span style="font-size: 12px; color: #888; cursor: help;">ℹ️</span>
-        <span class="tooltiptext">{tooltip}</span>
+    <div style="margin-bottom: 5px;">
+        <span style="font-weight: 500;">{label}</span>
+        <div class="tooltip" style="display: inline-block; margin-left: 5px;">
+            <span style="font-size: 14px; color: #0066cc; cursor: help;">ℹ️</span>
+            <span class="tooltiptext">{tooltip}</span>
+        </div>
     </div>
     """, unsafe_allow_html=True)
     return widget_func("", key=key, *args, **kwargs)
@@ -702,37 +695,46 @@ st.markdown("""
     
     .tooltip .tooltiptext {
         visibility: hidden;
-        width: 250px;
-        background-color: #555;
+        width: 280px;
+        background-color: #333;
         color: white;
-        text-align: center;
-        border-radius: 6px;
-        padding: 8px;
+        text-align: left;
+        border-radius: 8px;
+        padding: 10px;
         position: absolute;
-        z-index: 1;
-        bottom: 125%;
-        left: 50%;
-        margin-left: -125px;
+        z-index: 9999;
+        bottom: 120%;
+        right: 0;
         opacity: 0;
         transition: opacity 0.3s;
-        font-size: 12px;
+        font-size: 13px;
         line-height: 1.4;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        word-wrap: break-word;
     }
     
     .tooltip .tooltiptext::after {
         content: "";
         position: absolute;
         top: 100%;
-        left: 50%;
+        right: 20px;
         margin-left: -5px;
         border-width: 5px;
         border-style: solid;
-        border-color: #555 transparent transparent transparent;
+        border-color: #333 transparent transparent transparent;
     }
     
     .tooltip:hover .tooltiptext {
         visibility: visible;
         opacity: 1;
+    }
+    
+    /* Ensure tooltips don't get cut off in sidebar */
+    .stSidebar .tooltip .tooltiptext {
+        left: auto;
+        right: 0;
+        margin-left: 0;
+        width: 300px;
     }
     
     @keyframes pulse {
