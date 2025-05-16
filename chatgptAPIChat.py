@@ -180,93 +180,49 @@ if not st.session_state.api_key_valid:
         check_script = """
         <div id="key-check-result"></div>
         <script>
-        function checkAndValidateStoredKey() {
+        (function(){
             const resultDiv = document.getElementById('key-check-result');
             const storedKey = localStorage.getItem('chatgpt_api_key');
-            
             if (!storedKey) {
                 resultDiv.innerHTML = '<div style="color: #666; padding: 10px; background: #f5f5f5; border-radius: 5px;">No stored key found</div>';
                 return;
             }
-            
             try {
                 const decodedKey = atob(storedKey);
                 if (!decodedKey.startsWith('sk-')) {
                     resultDiv.innerHTML = '<div style="color: #ff6b35; padding: 10px; background: #ffeaa7; border-radius: 5px;">Invalid stored key format</div>';
                     return;
                 }
-                
-                // Show masked key and buttons
-                const maskedKey = decodedKey.substring(0, 7) + '...' + decodedKey.substring(decodedKey.length - 4);
+                const maskedKey = decodedKey.substring(0,7) + '...' + decodedKey.substring(decodedKey.length -4);
                 resultDiv.innerHTML = `
                     <div style="color: #2e7d32; background: #f0f8f0; padding: 15px; border-radius: 5px; border: 1px solid #4CAF50;">
                         <div style="margin-bottom: 10px;"><b>Found stored key:</b> ${maskedKey}</div>
-                        <button id="useStoredKeyBtn" style="padding: 8px 16px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer; margin-right: 10px;">✓ Use This Key</button>
-                        <button id="clearStoredKeyBtn" style="padding: 8px 16px; background: #f44336; color: white; border: none; border-radius: 4px; cursor: pointer;">✗ Remove Key</button>
+                        <button id="useStoredKeyBtn" style="padding: 8px 16px; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer;">✓ Use This Key</button>
                     </div>
                 `;
-                
-                // Handle use stored key - send to parent window
-                document.getElementById('useStoredKeyBtn').onclick = function() {
-                    resultDiv.innerHTML = '<div style="color: #2e7d32; padding: 10px; background: #f0f8f0; border-radius: 5px;">✓ Validating stored key...</div>';
-                    // Send message to parent window with the key
-                    window.parent.postMessage({
-                        type: 'USE_STORED_KEY',
-                        key: decodedKey
-                    }, '*');
-                };
-                
-                // Handle clear stored key
-                document.getElementById('clearStoredKeyBtn').onclick = function() {
-                    localStorage.removeItem('chatgpt_api_key');
-                    resultDiv.innerHTML = '<div style="color: #666; padding: 10px; background: #f5f5f5; border-radius: 5px;">Key removed successfully.</div>';
-                };
-                
+                document.getElementById('useStoredKeyBtn').onclick = function(){
+                    // Instead of postMessage, put key into an input field
+                    const input = document.createElement('input');
+                    input.type = 'text';
+                    input.value = decodedKey;
+                    input.id = 'storedKeyInput';
+                    input.style.position = 'fixed';
+                    input.style.top = '10px';
+                    input.style.left = '10px';
+                    input.style.zIndex = 9999;
+                    document.body.appendChild(input);
+                    input.select();
+                    document.execCommand('copy');
+                    alert('Stored API key copied to clipboard. Please paste it into the API key input box.');
+                }
             } catch (err) {
                 resultDiv.innerHTML = `<div style="color: #d32f2f; padding: 10px; background: #ffebee; border-radius: 5px;">Error reading key: ${err.message}</div>`;
             }
-        }
-        
-        // Listen for messages from the iframe
-        window.addEventListener('message', function(event) {
-            if (event.data.type === 'USE_STORED_KEY') {
-                // This runs in the parent window context
-                console.log('Received key from iframe');
-            }
-        });
-        
-        checkAndValidateStoredKey();
+        })();
         </script>
         """
-        
-        # Use a unique key for this component to ensure it recreates
         components.html(check_script, height=150)
-        
-        # Listen for messages from the JavaScript component
-        message_listener = """
-        <script>
-        window.addEventListener('message', function(event) {
-            if (event.data.type === 'USE_STORED_KEY') {
-                // Store the key in session storage so Streamlit can access it
-                sessionStorage.setItem('streamlit_use_stored_key', event.data.key);
-                // Trigger a page refresh to let Streamlit handle it
-                window.location.reload();
-            }
-        });
-        
-        // Check if we have a key to validate (after page refresh)
-        const keyToValidate = sessionStorage.getItem('streamlit_use_stored_key');
-        if (keyToValidate) {
-            // Clear it immediately
-            sessionStorage.removeItem('streamlit_use_stored_key');
-            // Send it to Streamlit via query params
-            const url = new URL(window.location);
-            url.searchParams.set('validate_stored_key', btoa(keyToValidate));
-            window.location.href = url.toString();
-        }
-        </script>
-        """
-        components.html(message_listener, height=0)
+
     
     # Handle stored key validation from query params
     if 'validate_stored_key' in st.query_params:
