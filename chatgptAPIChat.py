@@ -422,7 +422,7 @@ with col2:
 st.sidebar.markdown("### Model Parameters")
 
 # Helper function to create parameter with tooltip
-def create_parameter_with_tooltip(label, tooltip, widget_func, *args, **kwargs):
+def create_parameter_with_tooltip(label, tooltip, widget_func, key, *args, **kwargs):
     st.sidebar.markdown(f"""
     <div class="tooltip">
         <span style="margin-right: 5px;">{label}</span>
@@ -430,7 +430,7 @@ def create_parameter_with_tooltip(label, tooltip, widget_func, *args, **kwargs):
         <span class="tooltiptext">{tooltip}</span>
     </div>
     """, unsafe_allow_html=True)
-    return widget_func("", *args, **kwargs)
+    return widget_func("", key=key, *args, **kwargs)
 
 # Common parameters for all models
 if "max_tokens" in selected_model["supports"]:
@@ -438,6 +438,7 @@ if "max_tokens" in selected_model["supports"]:
         "Max Tokens",
         "Maximum number of tokens to generate. Higher values allow longer responses but cost more. Lower values create shorter, more concise responses.",
         st.sidebar.slider,
+        "max_tokens_slider",
         100, 4000, 1000
     )
 elif "max_completion_tokens" in selected_model["supports"]:
@@ -445,6 +446,7 @@ elif "max_completion_tokens" in selected_model["supports"]:
         "Max Completion Tokens",
         "Maximum tokens in the response for reasoning models. Higher values allow more detailed reasoning and longer explanations.",
         st.sidebar.slider,
+        "max_completion_tokens_slider",
         100, 32000, 4000
     )
 
@@ -454,6 +456,7 @@ if selected_model["type"] == "chat":
         "Temperature",
         "Controls randomness. Lower values (0.0) make responses more focused and deterministic. Higher values (1.0) make responses more creative and varied.",
         st.sidebar.slider,
+        "temperature_slider",
         0.0, 1.0, 0.7
     )
     
@@ -461,6 +464,7 @@ if selected_model["type"] == "chat":
         "Top P",
         "Controls diversity via nucleus sampling. Lower values focus on most likely tokens. Higher values consider more possibilities for creative responses.",
         st.sidebar.slider,
+        "top_p_slider",
         0.0, 1.0, 1.0
     )
     
@@ -468,6 +472,7 @@ if selected_model["type"] == "chat":
         "Frequency Penalty",
         "Reduces repetition based on token frequency. Higher values discourage repeating phrases and words.",
         st.sidebar.slider,
+        "freq_penalty_slider",
         0.0, 2.0, 0.0
     )
     
@@ -475,6 +480,7 @@ if selected_model["type"] == "chat":
         "Presence Penalty",
         "Encourages discussing new topics. Higher values make the model talk about different subjects rather than staying on the same topic.",
         st.sidebar.slider,
+        "pres_penalty_slider",
         0.0, 2.0, 0.0
     )
 
@@ -484,6 +490,7 @@ if selected_model["type"] == "reasoning" and "reasoning_effort" in selected_mode
         "Reasoning Effort",
         "Controls how much thinking time the model uses. Higher effort leads to better quality but slower and more expensive responses.",
         st.sidebar.selectbox,
+        "reasoning_effort_selectbox",
         ["low", "medium", "high"], index=1
     )
 
