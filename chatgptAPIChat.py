@@ -264,16 +264,22 @@ if not st.session_state.api_key_valid:
             <script>
             const storedKey = localStorage.getItem('chatgpt_api_key');
             if (storedKey) {
-                const decodedKey = atob(storedKey);
-                document.getElementById('api-key-display').innerHTML = 
-                    '<p style="color: green;">✅ Found stored API key! Click "Use Stored Key" below.</p>';
-                document.getElementById('use-stored-btn').style.display = 'block';
-                document.getElementById('use-stored-btn').onclick = function() {
-                    // Set the key in a hidden input to send to Streamlit
-                    document.getElementById('hidden-stored-key').value = decodedKey;
-                    // Submit the form
-                    document.getElementById('stored-key-form').submit();
-                };
+                try {
+                    const decodedKey = atob(storedKey);
+                    document.getElementById('api-key-display').innerHTML = 
+                        '<p style="color: green;">✅ Found stored API key! Click "Use Stored Key" below.</p>';
+                    document.getElementById('use-stored-btn').style.display = 'block';
+                    document.getElementById('use-stored-btn').onclick = function() {
+                        // Set the key in URL params to send to Streamlit
+                        const url = new URL(window.location);
+                        url.searchParams.set('stored_key', decodedKey);
+                        window.location = url;
+                    };
+                } catch (error) {
+                    console.error('Error decoding stored key:', error);
+                    document.getElementById('api-key-display').innerHTML = 
+                        '<p style="color: orange;">⚠️ Invalid stored API key. Please enter your key below.</p>';
+                }
             } else {
                 document.getElementById('api-key-display').innerHTML = 
                     '<p style="color: orange;">⚠️ No stored API key found. Please enter your key below.</p>';
@@ -281,9 +287,6 @@ if not st.session_state.api_key_valid:
             </script>
             <div id="api-key-display"></div>
             <button id="use-stored-btn" style="display: none; background-color: #4CAF50; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer;">Use Stored Key</button>
-            <form id="stored-key-form" style="display: none;">
-                <input type="hidden" id="hidden-stored-key" name="stored_key" />
-            </form>
         </div>
         """
         
@@ -325,10 +328,14 @@ if not st.session_state.api_key_valid:
                         # Save to browser storage
                         save_html = f"""
                         <script>
-                        const apiKey = '{api_key}';
-                        const encodedKey = btoa(apiKey);
-                        localStorage.setItem('chatgpt_api_key', encodedKey);
-                        alert('API key saved successfully!');
+                        try {{
+                            const apiKey = `{api_key}`;
+                            const encodedKey = btoa(apiKey);
+                            localStorage.setItem('chatgpt_api_key', encodedKey);
+                            console.log('API key saved to localStorage');
+                        }} catch (error) {{
+                            console.error('Error saving API key:', error);
+                        }}
                         </script>
                         """
                         components.html(save_html, height=0)
@@ -704,7 +711,8 @@ st.markdown("""
         position: absolute;
         z-index: 9999;
         bottom: 120%;
-        right: 0;
+        left: 50%;
+        margin-left: -140px;
         opacity: 0;
         transition: opacity 0.3s;
         font-size: 13px;
@@ -717,7 +725,7 @@ st.markdown("""
         content: "";
         position: absolute;
         top: 100%;
-        right: 20px;
+        left: 50%;
         margin-left: -5px;
         border-width: 5px;
         border-style: solid;
@@ -729,12 +737,17 @@ st.markdown("""
         opacity: 1;
     }
     
-    /* Ensure tooltips don't get cut off in sidebar */
+    /* Special positioning for sidebar tooltips */
     .stSidebar .tooltip .tooltiptext {
         left: auto;
-        right: 0;
+        right: -100px;
         margin-left: 0;
         width: 300px;
+    }
+    
+    .stSidebar .tooltip .tooltiptext::after {
+        left: auto;
+        right: 110px;
     }
     
     @keyframes pulse {
