@@ -1,3 +1,7 @@
+# Author: Jaloliddin Rustamov
+# Date: 17th May 2025
+# Description: A Streamlit application that provides a chat interface for OpenAI's GPT models via API.
+
 import streamlit as st
 from io import BytesIO
 from pathlib import Path
