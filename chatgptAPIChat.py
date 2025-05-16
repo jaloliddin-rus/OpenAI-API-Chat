@@ -211,28 +211,27 @@ if not st.session_state.api_key_valid:
         """
         components.html(check_script, height=120)
     
-    params = st.query_params
-    if params.get("use_stored_key") == "true":
-        stored_key = params.get("stored_key")
-        if stored_key:
-            with st.spinner("Validating stored API key..."):
-                is_valid, result = validate_api_key(stored_key)
-                if is_valid:
-                    st.session_state.api_key_valid = True
-                    st.session_state.client = result
-                    st.success("✅ Welcome back! Your stored API key is valid.")
-                    # Clear query params for security
-                    st.query_params.clear()
-                    st.rerun()
-                else:
-                    st.error(f"❌ Stored API key is invalid: {result}")
-                    clear_invalid_key_script = """
-                    <script>
-                    localStorage.removeItem('chatgpt_api_key');
-                    </script>
-                    """
-                    components.html(clear_invalid_key_script, height=0)
-                    st.query_params.clear()
+    #params = st.query_params
+    params = st.experimental_get_query_params()
+    use_stored = params.get("use_stored_key", [None])[0]
+    stored_key = params.get("stored_key", [None])[0]
+
+
+    if use_stored == "true" and stored_key:
+        # Validate the key here...
+        is_valid, result = validate_api_key(stored_key)
+        if is_valid:
+            st.session_state.api_key_valid = True
+            st.session_state.client = result
+            st.success("✅ Welcome back! Your stored API key is valid.")
+            # Clear query params for security
+            st.experimental_set_query_params()
+            st.rerun()
+        else:
+            st.error(f"❌ Stored API key is invalid: {result}")
+            # Optionally clear storage via JS
+            st.experimental_set_query_params()
+
 
     
     st.markdown("---")
