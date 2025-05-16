@@ -263,7 +263,7 @@ if not st.session_state.api_key_valid:
         retrieveStoredKey();
         </script>
         """
-        components.html(get_key_script, height=0, key="retrieve_stored_key")
+        components.html(get_key_script, height=0)
         st.session_state.use_stored_key = False  # Reset flag
     
     # Check if we have a stored key in query params (for internal use)
@@ -337,7 +337,7 @@ if not st.session_state.api_key_valid:
             </script>
             <div id="key-status">Checking...</div>
             """
-            key_check_result = components.html(get_stored_key_html, height=100, key="key_checker")
+            key_check_result = components.html(get_stored_key_html, height=100)
         
         # Alternative: Use stored key button
         if st.button("🔑 Use Stored API Key", help="Click this if you've checked and found a stored key", key="use_stored_key_btn"):
@@ -373,7 +373,7 @@ if not st.session_state.api_key_valid:
             validateAndUseStoredKey();
             </script>
             """
-            components.html(validate_stored_key_html, height=50, key="use_stored_validator")
+            components.html(validate_stored_key_html, height=50)
             
             # Also try to get the key directly for validation
             st.session_state.use_stored_key = True
@@ -516,7 +516,7 @@ def create_parameter_with_tooltip(label, tooltip, widget_func, key, *args, **kwa
         </div>
     </div>
     """, unsafe_allow_html=True)
-    return widget_func("", key=key, *args, **kwargs)
+    return widget_func(label, key=key, label_visibility="hidden", *args, **kwargs)
 
 # Common parameters for all models
 if "max_tokens" in selected_model["supports"]:
