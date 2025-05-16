@@ -151,7 +151,7 @@ st.title("🤖 ChatGPT API Chat Interface")
 
 # API Key Input Section
 if not st.session_state.api_key_valid:
-    st.markdown("## 🔑 Enter Your OpenAI API Key")
+    st.markdown("#### 🔑 Enter Your OpenAI API Key")
     st.markdown("""
     **To use this interface, you need your own OpenAI API key:**
     1. Go to [OpenAI API Keys](https://platform.openai.com/api-keys)
@@ -162,7 +162,7 @@ if not st.session_state.api_key_valid:
     """)
     
     # Check for returning users
-    st.markdown("### 🔍 Check for Stored API Key")
+    st.markdown("#### 🔍 Check for Stored API Key")
     st.markdown("If you've used this app before on this browser, you may have a stored API key.")
     
     if st.button("🔍 Check for Stored API Key", type="secondary"):
@@ -202,10 +202,14 @@ if not st.session_state.api_key_valid:
                     <div style="color: #2e7d32; padding: 15px; background-color: #e8f5e9; border-radius: 8px; margin: 10px 0;">
                         <strong>✅ Found stored API key!</strong><br>
                         <em>Key: ${maskedKey}</em><br><br>
-                        <button onclick="useStoredKey('${decodedKey}')" 
-                                style="background-color: #1976d2; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-size: 16px;">
-                            🔑 Use This Key
-                        </button>
+                        <form id="use-key-form" method="get" style="display: inline;">
+                            <input type="hidden" name="use_stored_key" value="true">
+                            <input type="hidden" name="stored_key" value="${decodedKey}">
+                            <button type="submit" 
+                                    style="background-color: #1976d2; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-size: 16px;">
+                                🔑 Use This Key
+                            </button>
+                        </form>
                         <button onclick="clearStoredKey()" 
                                 style="background-color: #d32f2f; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-size: 16px; margin-left: 10px;">
                             🗑️ Remove Key
@@ -220,14 +224,6 @@ if not st.session_state.api_key_valid:
                     </div>
                 `;
             }
-        }
-        
-        function useStoredKey(apiKey) {
-            // Use Streamlit's built-in query params method
-            const params = new URLSearchParams(window.location.search);
-            params.set('use_stored_key', 'true');
-            params.set('stored_key', apiKey);
-            window.location.search = params.toString();
         }
         
         function clearStoredKey() {
@@ -271,7 +267,7 @@ if not st.session_state.api_key_valid:
                     st.query_params.clear()
     
     st.markdown("---")
-    st.markdown("### ✍️ Enter New API Key")
+    st.markdown("#### ✍️ Enter New API Key")
     
     api_key = st.text_input(
         "OpenAI API Key", 
@@ -521,7 +517,7 @@ st.markdown("---")
 # Chat container with fixed height and scrolling
 chat_container = st.container()
 with chat_container:
-    st.markdown("### Chat History")
+    st.markdown("#### Chat History")
     
     # Create a scrollable chat area
     chat_placeholder = st.empty()
@@ -569,7 +565,7 @@ if uploaded_file:
         st.image(uploaded_file, caption=uploaded_file.name, width=300)
 
 # User input area at the bottom
-st.markdown("### Your Message")
+st.markdown("#### Your Message")
 with st.form(key="message_form", clear_on_submit=True):
     user_input = st.text_area("Type your message here...", height=100, key="user_message")
     col1, col2 = st.columns([4, 1])
