@@ -223,11 +223,11 @@ if not st.session_state.api_key_valid:
         }
         
         function useStoredKey(apiKey) {
-            // Redirect with the key as a query parameter
-            const currentUrl = new URL(window.location);
-            currentUrl.searchParams.set('use_stored_key', 'true');
-            currentUrl.searchParams.set('stored_key', apiKey);
-            window.location.href = currentUrl.toString();
+            // Use Streamlit's built-in query params method
+            const params = new URLSearchParams(window.location.search);
+            params.set('use_stored_key', 'true');
+            params.set('stored_key', apiKey);
+            window.location.search = params.toString();
         }
         
         function clearStoredKey() {
@@ -672,7 +672,8 @@ st.markdown("""
     
     .tooltip .tooltiptext {
         visibility: hidden;
-        width: 320px;
+        width: calc(100vw - 40px); /* Full viewport width minus padding */
+        max-width: 300px; /* Maximum width to prevent it from being too wide on large screens */
         background-color: #333;
         color: white;
         text-align: left;
@@ -680,15 +681,26 @@ st.markdown("""
         padding: 10px;
         position: absolute;
         z-index: 9999;
-        top: 50%;
-        left: 25px;
-        transform: translateY(-50%);
+        top: 100%;
+        left: 0;
+        margin-top: 5px;
         opacity: 0;
         transition: opacity 0.3s;
         font-size: 13px;
         line-height: 1.4;
         box-shadow: 0 4px 8px rgba(0,0,0,0.2);
         word-wrap: break-word;
+        white-space: normal;
+    }
+    
+    /* For sidebar tooltips specifically */
+    .stSidebar .tooltip .tooltiptext {
+        width: calc(100% + 100px); /* Sidebar width plus some extra space */
+        max-width: 280px;
+        left: 25px; /* Position to the right of the info icon */
+        top: 50%;
+        transform: translateY(-50%);
+        margin-top: 0;
     }
     
     .tooltip .tooltiptext::before {
@@ -700,6 +712,14 @@ st.markdown("""
         border-width: 5px;
         border-style: solid;
         border-color: transparent #333 transparent transparent;
+    }
+    
+    /* Adjust arrow for top-positioned tooltips */
+    .tooltip .tooltiptext:not(.stSidebar .tooltip .tooltiptext)::before {
+        top: -5px;
+        left: 10px;
+        margin-top: 0;
+        border-color: #333 transparent transparent transparent;
     }
     
     .tooltip:hover .tooltiptext {
